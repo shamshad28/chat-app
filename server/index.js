@@ -50,15 +50,15 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(cookieParser());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-app.get("/api/health", (req, res) => {
+app.get(["/api/health", "/health"], (req, res) => {
   res.status(200).json({ success: true, message: "Server is running" });
 });
 
-app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/conversations", conversationRoutes);
-app.use("/api/messages", messageRoutes);
-app.use("/api/upload", uploadRoutes);
+app.use(["/api/auth", "/auth"], authRoutes);
+app.use(["/api/users", "/users"], userRoutes);
+app.use(["/api/conversations", "/conversations"], conversationRoutes);
+app.use(["/api/messages", "/messages"], messageRoutes);
+app.use(["/api/upload", "/upload"], uploadRoutes);
 
 registerChatSocket(io);
 
