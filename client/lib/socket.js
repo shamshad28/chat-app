@@ -1,16 +1,21 @@
 import { io } from "socket.io-client";
 
 const getSocketUrl = () => {
+  if (process.env.NEXT_PUBLIC_SOCKET_URL) {
+    return process.env.NEXT_PUBLIC_SOCKET_URL;
+  }
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname || "localhost";
-    const envUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
-    if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
-      return envUrl;
+    const protocol = window.location.protocol === "https:" ? "https:" : "http:";
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return "http://localhost:5000";
     }
-    const protocol = window.location.protocol || "http:";
-    return `${protocol}//${hostname}:5000`;
+    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(hostname)) {
+      return `${protocol}//${hostname}:5000`;
+    }
+    return window.location.origin;
   }
-  return process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
+  return "http://localhost:5000";
 };
 
 const socket = io(getSocketUrl(), {

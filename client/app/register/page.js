@@ -31,14 +31,37 @@ export default function RegisterPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    if (!form.name.trim() || !form.username.trim() || !form.email.trim() || !form.password) {
+      setError("Please fill in all required fields.");
+      return;
+    }
+
+    if (form.password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const data = await registerUser(form);
+      const data = await registerUser({
+        name: form.name.trim(),
+        username: form.username.trim().toLowerCase(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+      });
       setUser(data.user);
       router.push("/chat");
     } catch (err) {
-      setError(err.response?.data?.message || "Registration failed");
+      const serverMsg = err.response?.data?.message;
+      if (serverMsg) {
+        setError(serverMsg);
+      } else if (err.code === "ECONNABORTED" || !err.response) {
+        setError("Cannot connect to server. Please make sure the backend server is running.");
+      } else {
+        setError(err.message || "Registration failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

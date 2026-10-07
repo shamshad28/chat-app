@@ -1,17 +1,22 @@
 import axios from "axios";
 
-// Dynamically resolve backend base URL (works across localhost, 127.0.0.1, and local network IP)
+// Dynamically resolve backend base URL (works across localhost, LAN IP, and production)
 const getBaseURL = () => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname || "localhost";
-    const envUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
-      return envUrl;
-    }
     const protocol = window.location.protocol || "http:";
-    return `${protocol}//${hostname}:5000`;
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return "http://localhost:5000";
+    }
+    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(hostname)) {
+      return `${protocol}//${hostname}:5000`;
+    }
+    return "";
   }
-  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+  return "http://localhost:5000";
 };
 
 const api = axios.create({
