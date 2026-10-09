@@ -9,8 +9,11 @@ export default function ChatPage() {
 
   if (loading || !user) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-[#f0f2f5] text-[#008069]">
-        <Loader2 className="w-8 h-8 animate-spin" />
+      <div className="flex flex-col h-screen w-screen items-center justify-center bg-[#111b21] text-[#00a884]">
+        <div className="w-14 h-14 rounded-full bg-[#202c33] flex items-center justify-center mb-4">
+          <Loader2 className="w-7 h-7 animate-spin text-[#00a884]" />
+        </div>
+        <span className="text-xs text-[#8696a0] font-medium tracking-wide">WhatsApp Web</span>
       </div>
     );
   }

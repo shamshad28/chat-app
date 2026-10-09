@@ -14,6 +14,15 @@ import IncomingCallModal from "../call/IncomingCallModal";
 import VideoCallModal from "../call/VideoCallModal";
 import NotificationBanner from "./NotificationBanner";
 import LiveClock from "./LiveClock";
+import WhatsAppTitleBar from "./WhatsAppTitleBar";
+import WhatsAppSidebarDock from "./WhatsAppSidebarDock";
+import WhatsAppEmptyState from "./WhatsAppEmptyState";
+import DummyLLMChat from "./DummyLLMChat";
+import WhatsAppSettingsModal from "./WhatsAppSettingsModal";
+import CallsList from "../call/CallsList";
+import ContactInfoSidebar from "./ContactInfoSidebar";
+import StatusList from "../status/StatusList";
+import ChannelsCommunitiesView from "./ChannelsCommunitiesView";
 
 import useAuthStore from "../../store/authStore";
 import useChatStore from "../../store/chatStore";
@@ -54,6 +63,7 @@ export default function ChatLayout({ initialConversationId = null }) {
 
   const conversations = useChatStore((state) => state.conversations);
   const setConversations = useChatStore((state) => state.setConversations);
+  const updateConversation = useChatStore((state) => state.updateConversation);
   const activeConversation = useChatStore((state) => state.activeConversation);
   const setActiveConversation = useChatStore((state) => state.setActiveConversation);
   const messages = useChatStore((state) => state.messages);
@@ -77,6 +87,21 @@ export default function ChatLayout({ initialConversationId = null }) {
   const [isGroupSettingOpen, setIsGroupSettingOpen] = useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // WhatsApp Desktop navigation states
+  const [activeDockView, setActiveDockView] = useState("chats");
+  const [showMetaAIChat, setShowMetaAIChat] = useState(false);
+  const [isContactInfoOpen, setIsContactInfoOpen] = useState(false);
+  const [missedCallsCount, setMissedCallsCount] = useState(1);
+
+  // Real unread messages calculation (never hardcoded!)
+  const totalUnreadCount = useMemo(() => {
+    return (conversations || []).reduce(
+      (acc, c) => acc + (Number(c.unreadCount) || 0),
+      0
+    );
+  }, [conversations]);
 
   // In-chat search
   const [isInChatSearchOpen, setIsInChatSearchOpen] = useState(false);
@@ -141,10 +166,16 @@ export default function ChatLayout({ initialConversationId = null }) {
 
   // Select conversation & load messages
   const handleSelectConversation = async (conversation) => {
+    setShowMetaAIChat(false);
+    setActiveDockView("chats");
     setActiveConversation(conversation);
     setShowMobileSidebar(false);
     setIsInChatSearchOpen(false);
     setInChatSearchQuery("");
+    setIsContactInfoOpen(false);
+
+    // Immediately mark conversation unread count as 0 in store to drop unread badge
+    updateConversation({ ...conversation, unreadCount: 0 });
 
     // Join socket room
     socket.emit("joinConversation", conversation._id);
@@ -370,338 +401,355 @@ export default function ChatLayout({ initialConversationId = null }) {
   const currentTypers = activeConversation ? typingMap[activeConversation._id] || [] : [];
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#f0f2f5] text-[#111b21] font-sans">
-      {/* 1. LEFT SIDEBAR */}
-      <aside
-        className={`${
-          showMobileSidebar ? "flex" : "hidden"
-        } md:flex flex-col w-full md:w-80 lg:w-96 flex-shrink-0 border-r border-[#d1d7db] bg-white z-20`}
-      >
-        {/* Top Header: Current User Bar */}
-        <div className="flex items-center justify-between px-4 h-[60px] min-h-[60px] max-h-[60px] border-b border-[#d1d7db] bg-[#f0f2f5] flex-shrink-0">
-          <div
-            onClick={() => setIsProfileOpen(true)}
-            className="flex items-center gap-3 cursor-pointer group min-w-0"
-          >
-            <div className="relative flex-shrink-0">
-              {currentUser?.avatar ? (
-                <img
-                  src={currentUser.avatar}
-                  alt={currentUser.name}
-                  className="w-10 h-10 rounded-full object-cover ring-2 ring-[#00a884]/30"
-                />
-              ) : (
-                <div
-                  className={`w-10 h-10 rounded-full bg-gradient-to-tr ${getAvatarColor(
-                    currentUser?._id || "me"
-                  )} flex items-center justify-center font-bold text-white text-sm ring-2 ring-[#00a884]/30`}
-                >
-                  {getInitials(currentUser?.name || "Me")}
-                </div>
-              )}
-              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#25d366] border-2 border-white shadow-sm" />
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#111b21] text-[#e9edef] font-sans">
+      {/* 1. NATIVE-LOOKING WINDOW TITLE BAR */}
+      <WhatsAppTitleBar />
+
+      {/* 2. MAIN APPLICATION WORKSPACE */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* A. Far Left Vertical Dock (WhatsApp Navigation Rail) */}
+        <WhatsAppSidebarDock
+          activeView={showMetaAIChat ? "meta-ai" : activeDockView}
+          onSelectView={(view) => {
+            setActiveDockView(view);
+            if (view === "meta-ai") {
+              setShowMetaAIChat(true);
+              setActiveConversation(null);
+            } else {
+              setShowMetaAIChat(false);
+            }
+            if (view === "calls") {
+              setMissedCallsCount(0);
+            }
+          }}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenProfile={() => setIsProfileOpen(true)}
+          currentUser={currentUser}
+          unreadChatsCount={totalUnreadCount}
+          missedCallsCount={missedCallsCount}
+        />
+
+        {/* B. Middle Sidebar Column (Chats / Calls / Status / Channels / Communities) */}
+        <aside
+          className={`${
+            showMobileSidebar && !showMetaAIChat ? "flex" : "hidden"
+          } md:flex flex-col w-full md:w-[380px] lg:w-[410px] flex-shrink-0 bg-[#111b21] border-r border-[#222e35] z-10`}
+        >
+          {/* Resilience Socket Status Warning */}
+          {!socketConnected && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-950/70 border-b border-amber-500/30 text-amber-300 text-xs font-medium animate-pulse">
+              <WifiOff className="w-3.5 h-3.5" />
+              <span>Connecting to real-time chat server...</span>
             </div>
+          )}
 
-            <div className="min-w-0 flex flex-col justify-center">
-              <h2 className="font-semibold text-sm text-[#111b21] truncate leading-tight group-hover:text-[#008069] transition-colors">
-                {currentUser?.name || "User"}
-              </h2>
-              <p className="text-[11px] text-[#667781] truncate leading-tight mt-0.5">@{currentUser?.username}</p>
-            </div>
+          {/* Dynamic Middle Panel View based on Dock Selection */}
+          <div className="flex-1 overflow-hidden bg-[#111b21]">
+            {activeDockView === "chats" && (
+              <ConversationList
+                onSelectConversation={(conv) => {
+                  setShowMetaAIChat(false);
+                  setActiveDockView("chats");
+                  handleSelectConversation(conv);
+                }}
+                onOpenNewChat={() => setIsNewChatOpen(true)}
+                onOpenNewGroup={() => setIsNewGroupOpen(true)}
+                onOpenSettings={() => setIsSettingsOpen(true)}
+                onOpenMetaAI={() => {
+                  setShowMetaAIChat(true);
+                  setActiveDockView("meta-ai");
+                  setActiveConversation(null);
+                }}
+                onLogout={handleLogout}
+              />
+            )}
+
+            {activeDockView === "calls" && (
+              <CallsList
+                onStartVoiceCall={(target) => {
+                  startCall({
+                    recipient: target,
+                    conversationId: activeConversation?._id || "call",
+                    isVideo: false,
+                    isGroup: target?.isGroup,
+                  });
+                }}
+                onStartVideoCall={(target) => {
+                  startCall({
+                    recipient: target,
+                    conversationId: activeConversation?._id || "call",
+                    isVideo: true,
+                    isGroup: target?.isGroup,
+                  });
+                }}
+                onSelectContactForChat={(conv) => {
+                  setActiveDockView("chats");
+                  handleSelectConversation(conv);
+                }}
+                conversations={conversations}
+              />
+            )}
+
+            {activeDockView === "status" && (
+              <StatusList
+                currentUser={currentUser}
+                onSendReply={(contactName, reply) => {
+                  const matchingConv = conversations.find(
+                    (c) =>
+                      c.name === contactName ||
+                      (c.members || []).some((m) => m.name === contactName)
+                  );
+                  if (matchingConv) {
+                    handleSelectConversation(matchingConv);
+                    handleSendMessage({
+                      conversationId: matchingConv._id,
+                      content: reply,
+                      type: "text",
+                    });
+                  }
+                }}
+              />
+            )}
+
+            {(activeDockView === "channels" ||
+              activeDockView === "communities" ||
+              activeDockView === "archived" ||
+              activeDockView === "starred") && (
+              <ChannelsCommunitiesView
+                viewType={activeDockView}
+                conversations={conversations}
+                onSelectConversation={(conv) => {
+                  setActiveDockView("chats");
+                  handleSelectConversation(conv);
+                }}
+              />
+            )}
           </div>
+        </aside>
 
-          {/* Quick Actions */}
-          <div className="flex items-center gap-1 text-[#54656f]">
-            <button
-              type="button"
-              onClick={() => setIsGlobalSearchOpen(true)}
-              title="Search chat history"
-              className="p-2 rounded-full hover:text-[#111b21] hover:bg-[#e9edef] transition-colors"
-            >
-              <Search className="w-4 h-4" />
-            </button>
+        {/* C. Right Main Pane: Meta AI Chat / Active Chat / WhatsApp Empty State */}
+        <main
+          className={`${
+            !showMobileSidebar || showMetaAIChat ? "flex" : "hidden"
+          } md:flex flex-1 flex-col h-full overflow-hidden bg-[#0b141a] relative`}
+        >
+          {showMetaAIChat ? (
+            /* Interactive Dummy LLM Meta AI Chat */
+            <DummyLLMChat
+              onClose={() => {
+                setShowMetaAIChat(false);
+                setActiveDockView("chats");
+              }}
+            />
+          ) : activeConversation ? (
+            <>
+              {/* Active Conversation Header (WhatsApp Dark Desktop Style) */}
+              <header className="flex items-center justify-between px-4 sm:px-6 h-[60px] min-h-[60px] max-h-[60px] border-b border-[#222e35] bg-[#202c33] z-10 flex-shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  {/* Mobile Back Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowMobileSidebar(true)}
+                    className="md:hidden p-2 -ml-2 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
 
-            <button
-              type="button"
-              onClick={handleToggleNotifications}
-              title={notificationEnabled ? "Web notifications enabled" : "Enable web notifications"}
-              className={`p-2 rounded-full transition-colors ${
-                notificationEnabled
-                  ? "text-[#008069] bg-[#e7fce3]"
-                  : "text-[#54656f] hover:text-[#111b21] hover:bg-[#e9edef]"
-              }`}
-            >
-              {notificationEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
-            </button>
+                  {/* Clickable Avatar & Contact Info */}
+                  <div
+                    onClick={() => setIsContactInfoOpen(true)}
+                    className="flex items-center gap-3 cursor-pointer group"
+                  >
+                    <div className="relative flex-shrink-0">
+                      {conversationAvatar ? (
+                        <img
+                          src={conversationAvatar}
+                          alt={conversationTitle}
+                          className="w-10 h-10 rounded-full object-cover ring-1 ring-[#222e35] group-hover:ring-[#00a884] transition-all"
+                        />
+                      ) : (
+                        <div
+                          className="w-10 h-10 rounded-full bg-[#534b3e] flex items-center justify-center text-[#e9edef] font-semibold text-sm shadow-xs group-hover:ring-1 group-hover:ring-[#00a884] transition-all"
+                        >
+                          {isGroup ? <Users className="w-5 h-5" /> : getInitials(conversationTitle)}
+                        </div>
+                      )}
 
-            <button
-              type="button"
-              onClick={() => setIsProfileOpen(true)}
-              title="Settings & Profile"
-              className="p-2 rounded-full hover:text-[#111b21] hover:bg-[#e9edef] transition-colors"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              title="Log out"
-              className="p-2 rounded-full hover:text-rose-600 hover:bg-rose-50 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Resilience Socket Status Warning */}
-        {!socketConnected && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border-b border-amber-200 text-amber-700 text-xs font-medium animate-pulse">
-            <WifiOff className="w-3.5 h-3.5" />
-            <span>Connecting to real-time chat server...</span>
-          </div>
-        )}
-
-        {/* Conversation List */}
-        <div className="flex-1 overflow-hidden bg-white">
-          <ConversationList
-            onSelectConversation={handleSelectConversation}
-            onOpenNewChat={() => setIsNewChatOpen(true)}
-            onOpenNewGroup={() => setIsNewGroupOpen(true)}
-          />
-        </div>
-      </aside>
-
-      {/* 2. MAIN CHAT AREA */}
-      <main
-        className={`${
-          !showMobileSidebar ? "flex" : "hidden"
-        } md:flex flex-1 flex-col h-full overflow-hidden bg-[#efeae2] relative`}
-      >
-        {activeConversation ? (
-          <>
-            {/* Active Conversation Header (WhatsApp Style) */}
-            <header className="flex items-center justify-between px-4 sm:px-6 h-[60px] min-h-[60px] max-h-[60px] border-b border-[#d1d7db] bg-[#f0f2f5] z-10 flex-shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                {/* Mobile Back to Sidebar Button */}
-                <button
-                  type="button"
-                  onClick={() => setShowMobileSidebar(true)}
-                  className="md:hidden p-2 -ml-2 rounded-full text-[#54656f] hover:text-[#111b21] hover:bg-[#e9edef]"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-
-                {/* Avatar */}
-                <div
-                  onClick={() => isGroup && setIsGroupSettingOpen(true)}
-                  className={`relative flex-shrink-0 ${isGroup ? "cursor-pointer" : ""}`}
-                >
-                  {conversationAvatar ? (
-                    <img
-                      src={conversationAvatar}
-                      alt={conversationTitle}
-                      className="w-10 h-10 rounded-full object-cover ring-1 ring-[#e9edef]"
-                    />
-                  ) : (
-                    <div
-                      className={`w-10 h-10 rounded-full bg-gradient-to-tr ${getAvatarColor(
-                        conversationAvatarId
-                      )} flex items-center justify-center text-white font-bold text-sm shadow-xs`}
-                    >
-                      {isGroup ? <Users className="w-5 h-5" /> : getInitials(conversationTitle)}
+                      {!isGroup && (
+                        <span
+                          className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#202c33] ${
+                            isOtherUserOnline
+                              ? "bg-[#25d366] shadow-xs"
+                              : "bg-[#8696a0]"
+                          }`}
+                        />
+                      )}
                     </div>
-                  )}
 
-                  {!isGroup && (
-                    <span
-                      className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${
-                        isOtherUserOnline
-                          ? "bg-[#25d366] shadow-xs"
-                          : "bg-[#8696a0]"
-                      }`}
-                    />
-                  )}
+                    {/* Contact Title & Status */}
+                    <div className="min-w-0 flex flex-col justify-center">
+                      <h1 className="font-semibold text-sm sm:text-base text-[#e9edef] group-hover:text-white truncate flex items-center gap-2 leading-tight transition-colors">
+                        <span>{conversationTitle}</span>
+                        {isGroup && (
+                          <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-[#103629] text-[#25d366] border border-[#25d366]/20">
+                            Group
+                          </span>
+                        )}
+                      </h1>
+
+                      <p className="text-xs text-[#8696a0] truncate flex items-center gap-1.5 leading-tight mt-0.5">
+                        {isGroup ? (
+                          <span>{activeConversation.members?.length || 0} members</span>
+                        ) : currentTypers.some((t) => (t._id || t.id)?.toString() === (otherUser?._id || otherUser?.id)?.toString()) ? (
+                          <span className="text-[#00a884] font-medium flex items-center gap-1 animate-pulse">
+                            typing...
+                          </span>
+                        ) : isOtherUserOnline ? (
+                          <span className="text-[#00a884] font-medium flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#25d366] animate-pulse" />
+                            online
+                          </span>
+                        ) : (
+                          <span className="text-[#8696a0] font-normal">
+                            {formatLiveLastSeen(otherUser?.lastSeen)}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Info Text: Name & Last Seen */}
-                <div className="min-w-0 flex flex-col justify-center">
-                  <h1 className="font-semibold text-sm sm:text-base text-[#111b21] truncate flex items-center gap-2 leading-tight">
-                    <span>{conversationTitle}</span>
-                    {isGroup && (
-                      <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-[#e7fce3] text-[#008069] border border-[#00a884]/20">
-                        Group
-                      </span>
-                    )}
-                  </h1>
+                {/* Header Actions: Call Buttons & In-Chat Search & Contact Info */}
+                <div className="flex items-center gap-2">
+                  <LiveClock className="hidden sm:inline-flex" />
 
-                  <p className="text-xs text-[#667781] truncate flex items-center gap-1.5 leading-tight mt-0.5">
-                    {isGroup ? (
-                      <span>{activeConversation.members?.length || 0} members</span>
-                    ) : currentTypers.some((t) => (t._id || t.id)?.toString() === (otherUser?._id || otherUser?.id)?.toString()) ? (
-                      <span className="text-[#00a884] font-medium flex items-center gap-1 animate-pulse">
-                        typing...
-                      </span>
-                    ) : isOtherUserOnline ? (
-                      <span className="text-[#00a884] font-medium flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#25d366] animate-pulse" />
-                        online
-                      </span>
-                    ) : (
-                      <span className="text-[#667781] font-normal">
-                        {formatLiveLastSeen(otherUser?.lastSeen)}
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {/* Header Actions: Live Clock, WhatsApp Call Buttons & Search */}
-              <div className="flex items-center gap-2">
-                {/* Live Digital Clock Badge */}
-                <LiveClock className="hidden sm:inline-flex" />
-
-                <div className="flex items-center gap-1 text-[#54656f]">
-                  {/* Voice Call Button */}
-                  <button
-                    type="button"
-                    onClick={handleStartVoiceCall}
-                    title={isGroup ? "Start group voice call" : "Voice call"}
-                    className="p-2 rounded-full text-[#54656f] hover:text-[#008069] hover:bg-[#e9edef] active:scale-95 transition-all"
-                  >
-                    <Phone className="w-4 h-4" />
-                  </button>
-
-                  {/* Video Call Button */}
-                  <button
-                    type="button"
-                    onClick={handleStartVideoCall}
-                    title={isGroup ? "Start group video call" : "Video call"}
-                    className="p-2 rounded-full text-[#54656f] hover:text-[#008069] hover:bg-[#e9edef] active:scale-95 transition-all"
-                  >
-                    <Video className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Search in this conversation"
-                    onClick={() => setIsInChatSearchOpen(!isInChatSearchOpen)}
-                    className={`p-2 rounded-full transition-colors ${
-                      isInChatSearchOpen
-                        ? "text-[#008069] bg-[#e7fce3]"
-                        : "text-[#54656f] hover:text-[#111b21] hover:bg-[#e9edef]"
-                    }`}
-                  >
-                    <Search className="w-4 h-4" />
-                  </button>
-
-                  {isGroup && (
+                  <div className="flex items-center gap-1 text-[#aebac1]">
                     <button
                       type="button"
-                      title="Group details & settings"
-                      onClick={() => setIsGroupSettingOpen(true)}
-                      className="p-2 rounded-full text-[#54656f] hover:text-[#111b21] hover:bg-[#e9edef] transition-colors"
+                      onClick={handleStartVoiceCall}
+                      title={isGroup ? "Start group voice call" : "Voice call"}
+                      className="p-2 rounded-full hover:text-[#00a884] hover:bg-[#2a3942] active:scale-95 transition-all"
+                    >
+                      <Phone className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleStartVideoCall}
+                      title={isGroup ? "Start group video call" : "Video call"}
+                      className="p-2 rounded-full hover:text-[#00a884] hover:bg-[#2a3942] active:scale-95 transition-all"
+                    >
+                      <Video className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      title="Search in this conversation"
+                      onClick={() => setIsInChatSearchOpen(!isInChatSearchOpen)}
+                      className={`p-2 rounded-full transition-colors ${
+                        isInChatSearchOpen
+                          ? "text-[#00a884] bg-[#103629]"
+                          : "text-[#aebac1] hover:text-[#e9edef] hover:bg-[#2a3942]"
+                      }`}
+                    >
+                      <Search className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      title={isGroup ? "Group info & settings" : "Contact info & details"}
+                      onClick={() => setIsContactInfoOpen(!isContactInfoOpen)}
+                      className={`p-2 rounded-full transition-colors ${
+                        isContactInfoOpen
+                          ? "text-[#00a884] bg-[#2a3942]"
+                          : "text-[#aebac1] hover:text-[#e9edef] hover:bg-[#2a3942]"
+                      }`}
                     >
                       <Info className="w-4 h-4" />
                     </button>
+                  </div>
+                </div>
+              </header>
+
+              {/* In-Chat Search Bar Drawer */}
+              {isInChatSearchOpen && (
+                <div className="flex items-center gap-2 px-6 py-2 bg-[#202c33] border-b border-[#222e35] animate-in slide-in-from-top-2 duration-150">
+                  <Search className="w-4 h-4 text-[#8696a0] flex-shrink-0" />
+                  <input
+                    type="text"
+                    value={inChatSearchQuery}
+                    onChange={(e) => setInChatSearchQuery(e.target.value)}
+                    placeholder="Filter messages in this conversation..."
+                    className="flex-1 bg-[#111b21] px-3 py-1.5 rounded-lg border border-[#2a3942] text-xs text-[#e9edef] placeholder-[#8696a0] focus:outline-none focus:border-[#00a884]"
+                    autoFocus
+                  />
+                  {inChatSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setInChatSearchQuery("")}
+                      className="text-xs text-[#8696a0] hover:text-[#e9edef]"
+                    >
+                      Clear
+                    </button>
                   )}
                 </div>
-              </div>
-            </header>
+              )}
 
-            {/* In-Chat Search Bar Drawer */}
-            {isInChatSearchOpen && (
-              <div className="flex items-center gap-2 px-6 py-2 bg-[#f0f2f5] border-b border-[#d1d7db] animate-in slide-in-from-top-2 duration-150">
-                <Search className="w-4 h-4 text-[#8696a0] flex-shrink-0" />
-                <input
-                  type="text"
-                  value={inChatSearchQuery}
-                  onChange={(e) => setInChatSearchQuery(e.target.value)}
-                  placeholder="Filter messages in this conversation..."
-                  className="flex-1 bg-white px-3 py-1.5 rounded-lg border border-[#d1d7db] text-xs text-[#111b21] placeholder-[#8696a0] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
-                  autoFocus
-                />
-                {inChatSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setInChatSearchQuery("")}
-                    className="text-xs text-[#667781] hover:text-[#111b21]"
-                  >
-                    Clear
-                  </button>
+              {/* Message Feed & Right Contact Info Drawer Container */}
+              <div className="flex-1 flex overflow-hidden">
+                <div className="flex-1 flex flex-col h-full overflow-hidden">
+                  {/* Message Feed with WhatsApp Wallpaper Pattern */}
+                  <div className="flex-1 overflow-hidden flex flex-col wa-chat-pattern">
+                    <MessageList
+                      messages={displayedMessages}
+                      currentUser={currentUser}
+                      isGroup={isGroup}
+                      typers={currentTypers}
+                      hasMore={hasMoreMessages && !inChatSearchQuery}
+                      loadingMore={loadingMoreMessages}
+                      onLoadMore={handleLoadMoreMessages}
+                      onReply={handleReplyToMessage}
+                      onReact={handleReactToMessage}
+                    />
+                  </div>
+
+                  {/* Message Composer Input */}
+                  <MessageInput
+                    conversationId={activeConversation._id}
+                    onSendMessage={handleSendMessage}
+                  />
+                </div>
+
+                {/* WhatsApp Contact / Group Info Right Sidebar */}
+                {isContactInfoOpen && (
+                  <ContactInfoSidebar
+                    isOpen={isContactInfoOpen}
+                    onClose={() => setIsContactInfoOpen(false)}
+                    conversation={activeConversation}
+                    currentUser={currentUser}
+                    isOtherUserOnline={isOtherUserOnline}
+                    messages={messages}
+                    onStartVoiceCall={handleStartVoiceCall}
+                    onStartVideoCall={handleStartVideoCall}
+                    onOpenSearch={() => setIsInChatSearchOpen(true)}
+                    onOpenGroupSettings={() => setIsGroupSettingOpen(true)}
+                  />
                 )}
               </div>
-            )}
-
-            {/* Message Feed with WhatsApp Wallpaper Pattern */}
-            <div className="flex-1 overflow-hidden flex flex-col wa-chat-pattern">
-              <MessageList
-                messages={displayedMessages}
-                currentUser={currentUser}
-                isGroup={isGroup}
-                typers={currentTypers}
-                hasMore={hasMoreMessages && !inChatSearchQuery}
-                loadingMore={loadingMoreMessages}
-                onLoadMore={handleLoadMoreMessages}
-                onReply={handleReplyToMessage}
-                onReact={handleReactToMessage}
-              />
-            </div>
-
-            {/* Message Composer Input */}
-            <MessageInput
-              conversationId={activeConversation._id}
-              onSendMessage={handleSendMessage}
+            </>
+          ) : (
+            /* WhatsApp Desktop Empty State matching screenshot */
+            <WhatsAppEmptyState
+              onSendDocument={() => setIsNewChatOpen(true)}
+              onAddContact={() => setIsNewChatOpen(true)}
+              onAskMetaAI={() => {
+                setShowMetaAIChat(true);
+                setActiveDockView("meta-ai");
+              }}
             />
-          </>
-        ) : (
-          /* WhatsApp Web Style Empty Active State with continuous top header line */
-          <div className="flex-1 flex flex-col h-full bg-[#f0f2f5] select-none">
-            {/* Top Empty Header Bar to keep continuous header line across the page */}
-            <div className="h-[60px] min-h-[60px] max-h-[60px] border-b border-[#d1d7db] bg-[#f0f2f5] w-full flex-shrink-0" />
-
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center border-b-6 border-[#25d366]">
-              <div className="relative mb-6">
-                <div className="w-24 h-24 rounded-full bg-[#e7fce3] border border-[#00a884]/20 flex items-center justify-center text-4xl shadow-sm">
-                  <MessageSquare className="w-12 h-12 text-[#008069]" />
-                </div>
-              </div>
-
-              <h2 className="text-2xl font-light text-[#41525d] mb-3">
-                PulseChat for Web
-              </h2>
-              <p className="max-w-md text-sm text-[#667781] mb-8 leading-relaxed">
-                Send and receive end-to-end encrypted messages with 1-on-1 chats, group channels,
-                audio & video calls, live last seen status, and file sharing.
-              </p>
-
-              <div className="flex flex-wrap items-center justify-center gap-3 mb-10">
-                <button
-                  type="button"
-                  onClick={() => setIsNewChatOpen(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#008069] hover:bg-[#00a884] text-white font-medium text-sm shadow-sm active:scale-95 transition-all"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  <span>New Chat</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsNewGroupOpen(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white hover:bg-[#f5f6f6] border border-[#d1d7db] text-[#111b21] font-medium text-sm shadow-xs active:scale-95 transition-all"
-                >
-                  <Users className="w-4 h-4" />
-                  <span>New Group</span>
-                </button>
-              </div>
-
-              <p className="text-xs text-[#8696a0] flex items-center gap-1.5">
-                <span>🔒</span>
-                <span>End-to-end encrypted real-time messaging</span>
-              </p>
-            </div>
-          </div>
-        )}
-      </main>
+          )}
+        </main>
+      </div>
 
       {/* 3. MODAL DIALOGS */}
       <NewChatModal
@@ -750,6 +798,13 @@ export default function ChatLayout({ initialConversationId = null }) {
       <ProfileModal
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
+      />
+
+      {/* WhatsApp Desktop Settings Modal */}
+      <WhatsAppSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onLogout={handleLogout}
       />
 
       {/* WhatsApp Voice & Video Call Modals */}

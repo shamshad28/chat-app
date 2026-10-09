@@ -1,15 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f0f2f5;
-  --foreground: #111b21;
-  --wa-green: #008069;
-  --wa-teal: #00a884;
+  --background: #111b21;
+  --foreground: #e9edef;
+  --wa-dark-bg: #111b21;
+  --wa-dark-rail: #202c33;
+  --wa-dark-panel: #111b21;
+  --wa-dark-hover: #202c33;
+  --wa-dark-active: #2a3942;
+  --wa-dark-border: #222e35;
+  --wa-green: #00a884;
   --wa-badge: #25d366;
-  --wa-chat-bg: #efeae2;
-  --wa-sent: #d9fdd3;
-  --wa-border: #d1d7db;
-  --wa-gray: #667781;
+  --wa-chat-bg: #0b141a;
+  --wa-sent: #005c4b;
+  --wa-received: #202c33;
+  --wa-border: #222e35;
+  --wa-gray: #8696a0;
+  --wa-blue-ticks: #53bdeb;
 }
 
 @theme inline {
@@ -24,10 +31,21 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   overflow: hidden;
+  user-select: none;
 }
 
-/* Authentic WhatsApp chat wallpaper subtle texture */
+/* Authentic WhatsApp dark theme chat wallpaper texture */
 .wa-chat-pattern {
+  background-color: #0b141a;
+  background-image:
+    radial-gradient(#1f2c34 1px, transparent 1px),
+    radial-gradient(#1f2c34 1px, #0b141a 1px);
+  background-size: 28px 28px;
+  background-position: 0 0, 14px 14px;
+}
+
+/* WhatsApp light theme wallpaper texture (if toggled) */
+.wa-chat-pattern-light {
   background-color: #efeae2;
   background-image:
     radial-gradient(#d3cebe 1px, transparent 1px),
@@ -36,7 +54,17 @@ body {
   background-position: 0 0, 12px 12px;
 }
 
-/* Custom WhatsApp smooth scrollbars */
+/* Meta AI Glowing Gradient Icon & Badge */
+.meta-ai-glow {
+  background: linear-gradient(135deg, #a855f7 0%, #6366f1 50%, #3b82f6 100%);
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.45);
+}
+
+.meta-ai-ring {
+  background: conic-gradient(from 180deg at 50% 50%, #c084fc 0deg, #818cf8 120deg, #38bdf8 240deg, #c084fc 360deg);
+}
+
+/* Custom WhatsApp smooth dark scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -47,11 +75,10 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(134, 150, 160, 0.35);
+  background: rgba(134, 150, 160, 0.25);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(134, 150, 160, 0.6);
+  background: rgba(134, 150, 160, 0.5);
 }
-

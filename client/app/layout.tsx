@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PulseChat - Real-Time Chat & Channels",
+  title: "WhatsApp",
   description:
-    "Direct end-to-end messaging, group channels, live presence indicators, typing indicators, read receipts, reactions, replies, and file sharing.",
+    "WhatsApp Web & Desktop - End-to-end encrypted messaging, Meta AI Assistant, group channels, and calls.",
 };
 
 export default function RootLayout({
@@ -26,9 +26,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
-      <body className="h-full w-full bg-[#f0f2f5] text-[#111b21] flex flex-col overflow-hidden">
+      <body className="h-full w-full bg-[#111b21] text-[#e9edef] flex flex-col overflow-hidden select-none">
         {children}
       </body>
     </html>

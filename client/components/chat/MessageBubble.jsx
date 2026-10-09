@@ -113,7 +113,7 @@ export default function MessageBubble({
             type="button"
             title="React"
             onClick={() => setShowReactionPicker(!showReactionPicker)}
-            className="p-1 rounded-full text-[#54656f] hover:text-[#111b21] hover:bg-[#f0f2f5] transition-colors"
+            className="p-1 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#202c33] transition-colors"
           >
             <Smile className="w-3.5 h-3.5" />
           </button>
@@ -121,7 +121,7 @@ export default function MessageBubble({
             type="button"
             title="Reply"
             onClick={() => onReply(message)}
-            className="p-1 rounded-full text-[#54656f] hover:text-[#111b21] hover:bg-[#f0f2f5] transition-colors"
+            className="p-1 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#202c33] transition-colors"
           >
             <CornerUpLeft className="w-3.5 h-3.5" />
           </button>
@@ -130,7 +130,7 @@ export default function MessageBubble({
               type="button"
               title={copied ? "Copied!" : "Copy"}
               onClick={handleCopy}
-              className="p-1 rounded-full text-[#54656f] hover:text-[#111b21] hover:bg-[#f0f2f5] transition-colors"
+              className="p-1 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#202c33] transition-colors"
             >
               <Copy className="w-3.5 h-3.5" />
             </button>
@@ -146,12 +146,12 @@ export default function MessageBubble({
           />
         )}
 
-        {/* Main Bubble Card (WhatsApp Style: Outgoing #d9fdd3, Incoming #ffffff) */}
+        {/* Main Bubble Card (WhatsApp Dark: Outgoing #005c4b, Incoming #202c33) */}
         <div
           className={`relative px-3 py-2 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] transition-all ${
             isMe
-              ? "bg-[#d9fdd3] text-[#111b21] rounded-xl rounded-tr-xs"
-              : "bg-white text-[#111b21] rounded-xl rounded-tl-xs"
+              ? "bg-[#005c4b] text-[#e9edef] rounded-xl rounded-tr-xs"
+              : "bg-[#202c33] text-[#e9edef] rounded-xl rounded-tl-xs"
           }`}
         >
           {/* Threaded Reply Quote Preview */}
@@ -160,18 +160,18 @@ export default function MessageBubble({
               onClick={() => onScrollToMessage && onScrollToMessage(message.replyTo._id)}
               className={`mb-2 p-2 rounded-lg text-xs cursor-pointer border-l-4 transition-opacity hover:opacity-90 ${
                 isMe
-                  ? "bg-black/5 border-[#00a884] text-[#111b21]"
-                  : "bg-[#f0f2f5] border-[#008069] text-[#111b21]"
+                  ? "bg-black/20 border-[#25d366] text-[#e9edef]"
+                  : "bg-[#182229] border-[#00a884] text-[#e9edef]"
               }`}
             >
-              <div className="flex items-center gap-1 font-semibold text-[11px] mb-0.5 text-[#008069]">
+              <div className="flex items-center gap-1 font-semibold text-[11px] mb-0.5 text-[#00a884]">
                 <CornerUpLeft className="w-3 h-3 opacity-80" />
                 <span>
                   {message.replyTo.sender?.name ||
                     (message.replyTo.sender === currentUserId ? "You" : "User")}
                 </span>
               </div>
-              <p className="truncate line-clamp-1 italic text-[11px] text-[#667781]">
+              <p className="truncate line-clamp-1 italic text-[11px] text-[#8696a0]">
                 {message.replyTo.content ||
                   (message.replyTo.type === "image" ? "📷 Photo" : "📎 Attachment")}
               </p>
@@ -252,7 +252,7 @@ export default function MessageBubble({
 
           {/* Text Content */}
           {message.content && (
-            <p className="text-[14.2px] text-[#111b21] leading-relaxed break-words whitespace-pre-wrap select-text pr-2">
+            <p className="text-[14.2px] text-[#e9edef] leading-relaxed break-words whitespace-pre-wrap select-text pr-2">
               {message.content}
             </p>
           )}
@@ -260,7 +260,7 @@ export default function MessageBubble({
           {/* Footer: Time & WhatsApp Blue Check Receipts */}
           <div
             className={`flex items-center gap-1 mt-0.5 text-[11px] ${
-              isMe ? "justify-end text-[#667781]" : "justify-end text-[#667781]"
+              isMe ? "justify-end text-[#8696a0]" : "justify-end text-[#8696a0]"
             }`}
           >
             <span className="text-[10.5px] leading-none">{formatMessageTime(message.createdAt)}</span>
@@ -292,8 +292,8 @@ export default function MessageBubble({
                 onClick={() => onReact(message._id, emoji)}
                 className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs shadow-xs transition-all active:scale-95 ${
                   group.hasUserReacted
-                    ? "bg-[#e7fce3] border border-[#00a884] text-[#008069]"
-                    : "bg-white hover:bg-[#f0f2f5] border border-[#e9edef] text-[#111b21]"
+                    ? "bg-[#005c4b] border border-[#25d366]/40 text-[#25d366]"
+                    : "bg-[#202c33] hover:bg-[#2a3942] border border-[#2a3942] text-[#e9edef]"
                 }`}
               >
                 <span>{emoji}</span>

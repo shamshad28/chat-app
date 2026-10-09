@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { searchUsers, getAllUsers } from "../../services/userService";
 import { createDirectConversation } from "../../services/conversationService";
@@ -58,17 +60,17 @@ export default function NewChatModal({ isOpen, onClose, onSelectConversation }) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="relative w-full max-w-md rounded-2xl bg-white border border-[#e9edef] shadow-2xl overflow-hidden text-[#111b21] animate-in zoom-in-95 duration-150">
-        {/* WhatsApp Green Header */}
-        <div className="flex items-center justify-between px-5 py-4 bg-[#008069] text-white">
+      <div className="relative w-full max-w-md rounded-2xl bg-[#111b21] border border-[#222e35] shadow-2xl overflow-hidden text-[#e9edef] animate-in zoom-in-95 duration-150">
+        {/* WhatsApp Signature Header */}
+        <div className="flex items-center justify-between px-5 py-4 bg-[#202c33] border-b border-[#222e35] text-white">
           <div className="flex items-center gap-2">
-            <MessageSquarePlus className="w-5 h-5 text-white" />
+            <MessageSquarePlus className="w-5 h-5 text-[#00a884]" />
             <h2 className="text-base font-semibold">New Chat</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-white/15 text-white transition-colors"
+            className="p-1.5 rounded-full hover:bg-[#2a3942] text-[#8696a0] hover:text-white transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -77,25 +79,25 @@ export default function NewChatModal({ isOpen, onClose, onSelectConversation }) 
         <div className="p-4">
           {/* Search input */}
           <div className="relative mb-3">
-            <Search className="absolute left-3.5 top-3 w-4 h-4 text-[#54656f]" />
+            <Search className="absolute left-3.5 top-3 w-4 h-4 text-[#8696a0]" />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search name, username or email..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-[#f0f2f5] text-sm text-[#111b21] placeholder-[#8696a0] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-[#202c33] text-sm text-[#e9edef] placeholder-[#8696a0] border border-[#2a3942] focus:outline-none focus:border-[#00a884]"
               autoFocus
             />
           </div>
 
           {/* Users list */}
-          <div className="max-h-72 overflow-y-auto divide-y divide-[#f0f2f5] scrollbar-thin">
+          <div className="max-h-72 overflow-y-auto divide-y divide-[#222e35]/60 scrollbar-thin">
             {loading ? (
-              <div className="py-8 flex justify-center text-[#008069]">
+              <div className="py-8 flex justify-center text-[#00a884]">
                 <Loader2 className="w-6 h-6 animate-spin" />
               </div>
             ) : users.length === 0 ? (
-              <p className="py-8 text-center text-sm text-[#667781]">
+              <p className="py-8 text-center text-sm text-[#8696a0]">
                 {query ? "No users matching your search." : "No other users found."}
               </p>
             ) : (
@@ -107,7 +109,7 @@ export default function NewChatModal({ isOpen, onClose, onSelectConversation }) 
                   <div
                     key={`${u._id}-${idx}`}
                     onClick={() => handleStartChat(u)}
-                    className="flex items-center justify-between py-2.5 px-2 hover:bg-[#f5f6f6] cursor-pointer transition-colors"
+                    className="flex items-center justify-between py-2.5 px-2 hover:bg-[#202c33] cursor-pointer rounded-lg transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="relative flex-shrink-0">
@@ -115,30 +117,28 @@ export default function NewChatModal({ isOpen, onClose, onSelectConversation }) 
                           <img
                             src={u.avatar}
                             alt={u.name}
-                            className="w-10 h-10 rounded-full object-cover ring-1 ring-[#e9edef]"
+                            className="w-10 h-10 rounded-full object-cover ring-1 ring-[#222e35]"
                           />
                         ) : (
                           <div
-                            className={`w-10 h-10 rounded-full bg-gradient-to-tr ${getAvatarColor(
-                              u._id
-                            )} flex items-center justify-center font-bold text-white text-xs shadow-xs`}
+                            className={`w-10 h-10 rounded-full bg-[#534b3e] flex items-center justify-center font-bold text-white text-xs shadow-xs`}
                           >
                             {getInitials(u.name)}
                           </div>
                         )}
                         <span
-                          className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+                          className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#111b21] ${
                             isOnline ? "bg-[#25d366]" : "bg-[#8696a0]"
                           }`}
                         />
                       </div>
                       <div className="min-w-0">
-                        <p className="font-medium text-sm text-[#111b21] truncate">{u.name}</p>
-                        <p className="text-xs text-[#667781] truncate flex items-center gap-1.5">
+                        <p className="font-medium text-sm text-[#e9edef] truncate">{u.name}</p>
+                        <p className="text-xs text-[#8696a0] truncate flex items-center gap-1.5">
                           <span>@{u.username}</span>
                           <span>•</span>
                           {isOnline ? (
-                            <span className="text-[#008069] font-medium">online</span>
+                            <span className="text-[#00a884] font-medium">online</span>
                           ) : (
                             <span>{formatLiveLastSeen(u.lastSeen)}</span>
                           )}
@@ -148,7 +148,7 @@ export default function NewChatModal({ isOpen, onClose, onSelectConversation }) 
                     <button
                       type="button"
                       disabled={creating}
-                      className="px-3.5 py-1.5 rounded-full bg-[#008069] hover:bg-[#00a884] text-white text-xs font-medium transition-all shadow-xs"
+                      className="px-3.5 py-1.5 rounded-full bg-[#00a884] hover:bg-[#008069] text-white text-xs font-medium transition-all shadow-xs"
                     >
                       Chat
                     </button>

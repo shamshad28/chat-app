@@ -15,6 +15,8 @@ import {
   Video,
   CornerUpLeft,
   Loader2,
+  Mic,
+  Trash2,
 } from "lucide-react";
 
 const EMOJI_PALETTE = [
@@ -29,6 +31,44 @@ export default function MessageInput({ conversationId, onSendMessage }) {
   const [filePreviews, setFilePreviews] = useState([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+
+  // Voice recording timer
+  useEffect(() => {
+    let interval;
+    if (isRecordingVoice) {
+      interval = setInterval(() => {
+        setRecordingSeconds((s) => s + 1);
+      }, 1000);
+    } else {
+      setRecordingSeconds(0);
+    }
+    return () => clearInterval(interval);
+  }, [isRecordingVoice]);
+
+  const handleSendVoiceNote = () => {
+    const mins = Math.floor(recordingSeconds / 60);
+    const secs = recordingSeconds % 60;
+    const durationStr = `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+
+    onSendMessage({
+      conversationId,
+      content: `🎤 Voice note (${durationStr})`,
+      type: "audio",
+      attachments: [],
+      replyTo: replyingTo?._id || null,
+    });
+
+    setIsRecordingVoice(false);
+    setRecordingSeconds(0);
+    setReplyingTo(null);
+  };
+
+  const handleDiscardVoiceNote = () => {
+    setIsRecordingVoice(false);
+    setRecordingSeconds(0);
+  };
 
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
@@ -170,23 +210,23 @@ export default function MessageInput({ conversationId, onSendMessage }) {
   };
 
   return (
-    <div className="relative border-t border-zinc-800/80 bg-zinc-950/80 backdrop-blur-xl p-3 sm:p-4">
+    <div className="relative border-t border-[#222e35] bg-[#202c33] p-2.5 sm:p-3 select-none">
       {/* Active Reply Banner */}
       {replyingTo && (
-        <div className="flex items-center justify-between gap-3 mb-2.5 px-3.5 py-2 rounded-2xl bg-zinc-900/90 border border-violet-500/30 text-xs shadow-md animate-in slide-in-from-bottom-2 duration-150">
+        <div className="flex items-center justify-between gap-3 mb-2 px-3 py-1.5 rounded-xl bg-[#182229] border-l-4 border-[#00a884] text-xs shadow-md animate-in slide-in-from-bottom-2 duration-150">
           <div className="flex items-center gap-2 overflow-hidden">
-            <CornerUpLeft className="w-4 h-4 text-violet-400 flex-shrink-0" />
-            <span className="font-semibold text-violet-400 flex-shrink-0">
+            <CornerUpLeft className="w-3.5 h-3.5 text-[#00a884] flex-shrink-0" />
+            <span className="font-semibold text-[#00a884] flex-shrink-0">
               Replying to {replyingTo.sender?.name || "User"}:
             </span>
-            <span className="text-zinc-300 truncate italic">
+            <span className="text-[#8696a0] truncate italic">
               {replyingTo.content || (replyingTo.type === "image" ? "📷 Photo" : "📎 Attachment")}
             </span>
           </div>
           <button
             type="button"
             onClick={() => setReplyingTo(null)}
-            className="p-1 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+            className="p-1 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#202c33] transition-colors"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -199,24 +239,24 @@ export default function MessageInput({ conversationId, onSendMessage }) {
           {filePreviews.map((preview, index) => (
             <div
               key={index}
-              className="relative flex-shrink-0 w-20 h-20 rounded-xl bg-white border border-[#e9edef] overflow-hidden group shadow-xs"
+              className="relative flex-shrink-0 w-20 h-20 rounded-xl bg-[#111b21] border border-[#2a3942] overflow-hidden group shadow-xs"
             >
               {preview.url ? (
                 <img src={preview.url} alt={preview.name} className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center text-[#54656f]">
+                <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center text-[#8696a0]">
                   {preview.type.startsWith("video/") ? (
-                    <Video className="w-6 h-6 text-[#008069]" />
+                    <Video className="w-6 h-6 text-[#00a884]" />
                   ) : (
-                    <FileText className="w-6 h-6 text-[#008069]" />
+                    <FileText className="w-6 h-6 text-[#00a884]" />
                   )}
-                  <span className="text-[9px] truncate w-full mt-1 font-medium">{preview.name}</span>
+                  <span className="text-[9px] truncate w-full mt-1 font-medium text-[#d1d7db]">{preview.name}</span>
                 </div>
               )}
               <button
                 type="button"
                 onClick={() => removeFile(index)}
-                className="absolute top-1 right-1 p-1 rounded-full bg-black/60 hover:bg-black text-white transition-colors"
+                className="absolute top-1 right-1 p-1 rounded-full bg-black/70 hover:bg-black text-white transition-colors"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -227,14 +267,14 @@ export default function MessageInput({ conversationId, onSendMessage }) {
 
       {/* Emoji Picker Popup */}
       {showEmojiPicker && (
-        <div className="absolute bottom-16 left-4 z-30 p-3 rounded-2xl bg-white border border-[#e9edef] shadow-2xl animate-in zoom-in-95 duration-150">
+        <div className="absolute bottom-16 left-4 z-30 p-3 rounded-2xl bg-[#202c33] border border-[#2a3942] shadow-2xl animate-in zoom-in-95 duration-150">
           <div className="grid grid-cols-8 gap-1">
             {EMOJI_PALETTE.map((emoji) => (
               <button
                 key={emoji}
                 type="button"
                 onClick={() => addEmoji(emoji)}
-                className="w-8 h-8 flex items-center justify-center text-lg rounded-lg hover:bg-[#f0f2f5] hover:scale-120 transition-all active:scale-95"
+                className="w-8 h-8 flex items-center justify-center text-lg rounded-lg hover:bg-[#2a3942] hover:scale-120 transition-all active:scale-95"
               >
                 {emoji}
               </button>
@@ -244,69 +284,112 @@ export default function MessageInput({ conversationId, onSendMessage }) {
       )}
 
       {/* Input Bar Form (WhatsApp Style) */}
-      <form onSubmit={handleSubmit} className="flex items-center gap-2 max-w-5xl mx-auto">
-        {/* Hidden File Input */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          multiple
-          className="hidden"
-          accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.zip"
-        />
+      {isRecordingVoice ? (
+        <div className="flex items-center justify-between gap-3 max-w-5xl mx-auto px-2 py-1 bg-[#202c33] rounded-xl border border-[#2a3942] animate-in fade-in duration-100">
+          <button
+            type="button"
+            onClick={handleDiscardVoiceNote}
+            title="Discard voice recording"
+            className="p-2 rounded-full text-rose-400 hover:bg-rose-500/10 transition-colors"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
 
-        {/* Emoji Trigger Button */}
-        <button
-          type="button"
-          title="Emojis"
-          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-          className={`p-2.5 rounded-full transition-colors ${
-            showEmojiPicker
-              ? "text-[#008069] bg-[#e7fce3]"
-              : "text-[#54656f] hover:text-[#111b21] hover:bg-[#e9edef]"
-          }`}
-        >
-          <Smile className="w-5 h-5" />
-        </button>
+          <div className="flex items-center gap-2.5 text-xs text-white">
+            <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
+            <span className="font-medium text-rose-400">Recording</span>
+            <span className="font-mono text-sm font-semibold">
+              {Math.floor(recordingSeconds / 60)}:
+              {recordingSeconds % 60 < 10 ? "0" : ""}
+              {recordingSeconds % 60}
+            </span>
+          </div>
 
-        {/* Attachment Button */}
-        <button
-          type="button"
-          title="Attach"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading || sendingMessage}
-          className="p-2.5 rounded-full text-[#54656f] hover:text-[#111b21] hover:bg-[#e9edef] transition-colors disabled:opacity-50"
-        >
-          <Paperclip className="w-5 h-5" />
-        </button>
-
-        {/* Expanding Textarea */}
-        <div className="relative flex-1">
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={handleTextChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a message"
-            rows={1}
-            disabled={uploading || sendingMessage}
-            className="w-full resize-none max-h-32 py-2 px-4 rounded-lg bg-white border border-[#e9edef] text-[#111b21] placeholder-[#8696a0] focus:outline-none focus:border-[#00a884] text-sm leading-relaxed shadow-xs"
-          />
+          <button
+            type="button"
+            onClick={handleSendVoiceNote}
+            title="Send voice note"
+            className="p-2.5 rounded-full bg-[#00a884] hover:bg-[#008069] text-white shadow-sm active:scale-95 transition-all"
+          >
+            <Send className="w-4 h-4" />
+          </button>
         </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="flex items-center gap-2 max-w-5xl mx-auto">
+          {/* Hidden File Input */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            multiple
+            className="hidden"
+            accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.zip"
+          />
 
-        {/* Send Button (WhatsApp Green Circular Button) */}
-        <button
-          type="submit"
-          disabled={uploading || sendingMessage || (!content.trim() && selectedFiles.length === 0)}
-          className="p-2.5 rounded-full bg-[#008069] hover:bg-[#00a884] text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm active:scale-95 transition-all flex items-center justify-center flex-shrink-0"
-        >
-          {uploading || sendingMessage ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
+          {/* Emoji Trigger Button */}
+          <button
+            type="button"
+            title="Emojis"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className={`p-2 rounded-full transition-colors ${
+              showEmojiPicker
+                ? "text-[#00a884] bg-[#103629]"
+                : "text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]"
+            }`}
+          >
+            <Smile className="w-5 h-5" />
+          </button>
+
+          {/* Attachment Button */}
+          <button
+            type="button"
+            title="Attach"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || sendingMessage}
+            className="p-2 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] transition-colors disabled:opacity-50"
+          >
+            <Paperclip className="w-5 h-5" />
+          </button>
+
+          {/* Expanding Textarea */}
+          <div className="relative flex-1">
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={handleTextChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message"
+              rows={1}
+              disabled={uploading || sendingMessage}
+              className="w-full resize-none max-h-32 py-2 px-4 rounded-lg bg-[#2a3942] border border-transparent text-[#e9edef] placeholder-[#8696a0] focus:outline-none focus:border-[#00a884]/60 text-sm leading-relaxed"
+            />
+          </div>
+
+          {/* Send or Voice Note Mic Button (WhatsApp Behavior) */}
+          {content.trim() || selectedFiles.length > 0 ? (
+            <button
+              type="submit"
+              disabled={uploading || sendingMessage}
+              className="p-2.5 rounded-full bg-[#00a884] hover:bg-[#008069] text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm active:scale-95 transition-all flex items-center justify-center flex-shrink-0"
+            >
+              {uploading || sendingMessage ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
+            </button>
           ) : (
-            <Send className="w-5 h-5" />
+            <button
+              type="button"
+              onClick={() => setIsRecordingVoice(true)}
+              title="Voice note"
+              className="p-2.5 rounded-full bg-[#202c33] hover:bg-[#2a3942] text-[#00a884] hover:text-[#25d366] active:scale-95 transition-all flex items-center justify-center flex-shrink-0 border border-[#2a3942]"
+            >
+              <Mic className="w-5 h-5" />
+            </button>
           )}
-        </button>
-      </form>
+        </form>
+      )}
     </div>
   );
 }

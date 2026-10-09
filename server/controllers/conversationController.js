@@ -1,5 +1,6 @@
 const Conversation = require("../models/Conversation");
 const User = require("../models/User");
+const Message = require("../models/Message");
 
 // Create or find a direct conversation
 const createDirectConversation = async (req, res) => {
@@ -152,10 +153,40 @@ const getMyConversations = async (req, res) => {
       })
       .sort({ updatedAt: -1 });
 
+    const conversationIds = conversations.map((c) => c._id);
+
+    // Calculate actual unread message count for current user
+    const unreadAgg = await Message.aggregate([
+      {
+        $match: {
+          conversation: { $in: conversationIds },
+          sender: { $ne: req.user._id },
+          readBy: { $ne: req.user._id },
+        },
+      },
+      {
+        $group: {
+          _id: "$conversation",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const unreadMap = {};
+    unreadAgg.forEach((item) => {
+      unreadMap[item._id.toString()] = item.count;
+    });
+
+    const conversationsWithUnread = conversations.map((c) => {
+      const obj = c.toObject();
+      obj.unreadCount = unreadMap[c._id.toString()] || 0;
+      return obj;
+    });
+
     res.status(200).json({
       success: true,
-      count: conversations.length,
-      conversations,
+      count: conversationsWithUnread.length,
+      conversations: conversationsWithUnread,
     });
   } catch (error) {
     console.error("Get conversations error:", error);
