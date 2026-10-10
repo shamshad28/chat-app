@@ -207,6 +207,27 @@ const useChatStore = create((set, get) => ({
       };
     }),
 
+  deleteMessageInStore: (messageId) =>
+    set((state) => ({
+      messages: state.messages.filter(
+        (m) => (m._id || m.tempId)?.toString() !== messageId?.toString()
+      ),
+    })),
+
+  clearMessagesInStore: (conversationId) =>
+    set((state) => {
+      const isCurrentActive =
+        state.activeConversation?._id?.toString() === conversationId?.toString();
+      return {
+        messages: isCurrentActive ? [] : state.messages,
+        conversations: state.conversations.map((c) =>
+          c._id?.toString() === conversationId?.toString()
+            ? { ...c, lastMessage: null, unreadCount: 0 }
+            : c
+        ),
+      };
+    }),
+
   updateMessageReactions: (messageId, reactions) =>
     set((state) => {
       const targetId = messageId?.toString();

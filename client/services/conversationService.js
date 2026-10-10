@@ -53,3 +53,13 @@ export const updateGroupSettings = async (conversationId, data) => {
   const response = await api.put(`/api/conversations/${conversationId}`, data);
   return response.data;
 };
+
+export const deleteConversation = async (conversationId) => {
+  const response = await api.delete(`/api/conversations/${conversationId}`);
+  return response.data;
+};
+
+export const clearChatMessages = async (conversationId) => {
+  const response = await api.delete(`/api/conversations/${conversationId}/messages`);
+  return response.data;
+};

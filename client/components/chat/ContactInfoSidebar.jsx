@@ -39,6 +39,8 @@ export default function ContactInfoSidebar({
   onStartVideoCall,
   onOpenSearch,
   onOpenGroupSettings,
+  onClearChat,
+  onDeleteChat,
 }) {
   const [activeMediaTab, setActiveMediaTab] = useState("media"); // 'media' | 'docs' | 'links'
   const [isMuted, setIsMuted] = useState(conversation?.isMuted || false);
@@ -117,8 +119,33 @@ export default function ContactInfoSidebar({
     }
   };
 
+  const handleClearMessages = async () => {
+    if (
+      confirm(
+        `Are you sure you want to clear all messages in this chat with "${title}"? This cannot be undone.`
+      )
+    ) {
+      if (onClearChat) {
+        await onClearChat(conversation._id);
+      }
+    }
+  };
+
+  const handleDeleteChat = async () => {
+    if (
+      confirm(
+        `Are you sure you want to delete this entire chat with "${title}"? All messages and history will be permanently deleted.`
+      )
+    ) {
+      if (onDeleteChat) {
+        await onDeleteChat(conversation._id);
+        onClose();
+      }
+    }
+  };
+
   return (
-    <aside className="w-full sm:w-[340px] md:w-[380px] h-full bg-[#111b21] border-l border-[#222e35] flex flex-col overflow-hidden text-[#e9edef] z-20 flex-shrink-0 animate-in slide-in-from-right duration-200">
+    <aside className="fixed inset-0 z-40 md:relative md:inset-auto md:w-[360px] lg:w-[380px] h-full bg-[#111b21] border-l border-[#222e35] flex flex-col overflow-hidden text-[#e9edef] flex-shrink-0 animate-in slide-in-from-right duration-200 shadow-2xl md:shadow-none">
       {/* 1. Header with Close Button */}
       <div className="h-[60px] min-h-[60px] max-h-[60px] px-4 bg-[#202c33] border-b border-[#222e35] flex items-center justify-between flex-shrink-0">
         <h3 className="font-semibold text-sm text-[#e9edef]">
@@ -523,6 +550,26 @@ export default function ContactInfoSidebar({
               <span>{blocked ? `Unblock ${title}` : `Block ${title}`}</span>
             </button>
           )}
+
+          {/* Clear Messages */}
+          <button
+            type="button"
+            onClick={handleClearMessages}
+            className="w-full py-2.5 px-3 rounded-xl text-xs font-medium text-amber-400 hover:bg-amber-500/10 flex items-center gap-2.5 transition-colors"
+          >
+            <Trash2 className="w-4 h-4 text-amber-400" />
+            <span>Clear chat</span>
+          </button>
+
+          {/* Delete Chat */}
+          <button
+            type="button"
+            onClick={handleDeleteChat}
+            className="w-full py-2.5 px-3 rounded-xl text-xs font-medium text-rose-400 hover:bg-rose-500/10 flex items-center gap-2.5 transition-colors"
+          >
+            <Trash2 className="w-4 h-4 text-rose-400" />
+            <span>{isGroup ? "Exit & delete group" : "Delete chat"}</span>
+          </button>
 
           <button
             type="button"

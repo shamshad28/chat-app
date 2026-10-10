@@ -3,7 +3,7 @@ import axios from "axios";
 // Dynamically resolve backend base URL (works across localhost, LAN IP, and production)
 const getBaseURL = () => {
   if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "");
   }
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname || "localhost";
@@ -37,6 +37,12 @@ api.interceptors.request.use((config) => {
       config.headers.Authorization = `Bearer ${token}`;
     }
   }
+
+  // If payload is FormData, remove Content-Type header so browser sets multipart/form-data with boundary
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+    delete config.headers["Content-Type"];
+  }
+
   return config;
 });
 

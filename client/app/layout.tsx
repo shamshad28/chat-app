@@ -18,6 +18,13 @@ export const metadata: Metadata = {
     "WhatsApp Web & Desktop - End-to-end encrypted messaging, Meta AI Assistant, group channels, and calls.",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export default function RootLayout({
   children,
 }: {

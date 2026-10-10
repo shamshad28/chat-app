@@ -17,6 +17,7 @@ import {
   Loader2,
   Mic,
   Trash2,
+  UploadCloud,
 } from "lucide-react";
 
 const EMOJI_PALETTE = [
@@ -25,7 +26,11 @@ const EMOJI_PALETTE = [
   "😭", "🤯", "🥳", "👀", "👏", "💪", "🌟", "👌"
 ];
 
-export default function MessageInput({ conversationId, onSendMessage }) {
+export default function MessageInput({
+  conversationId,
+  onSendMessage,
+  droppedFiles = null,
+}) {
   const [content, setContent] = useState("");
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [filePreviews, setFilePreviews] = useState([]);
@@ -33,6 +38,45 @@ export default function MessageInput({ conversationId, onSendMessage }) {
   const [uploading, setUploading] = useState(false);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+
+  const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
+  const typingTimerRef = useRef(null);
+  const isTypingRef = useRef(false);
+
+  const currentUser = useAuthStore((state) => state.user);
+  const replyingTo = useChatStore((state) => state.replyingTo);
+  const setReplyingTo = useChatStore((state) => state.setReplyingTo);
+  const sendingMessage = useChatStore((state) => state.sendingMessage);
+
+  // Helper to add files to state with image previews
+  const addFiles = (files) => {
+    const fileArray = Array.from(files || []).filter(Boolean);
+    if (fileArray.length === 0) return;
+
+    setSelectedFiles((prev) => [...prev, ...fileArray]);
+
+    const newPreviews = fileArray.map((file) => ({
+      file,
+      name: file.name,
+      size: file.size,
+      type: file.type || "application/octet-stream",
+      url: file.type?.startsWith("image/") ? URL.createObjectURL(file) : null,
+    }));
+
+    setFilePreviews((prev) => [...prev, ...newPreviews]);
+
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
+
+  // React to external dropped files from chat window
+  useEffect(() => {
+    if (droppedFiles && droppedFiles.files && droppedFiles.files.length > 0) {
+      addFiles(droppedFiles.files);
+    }
+  }, [droppedFiles]);
 
   // Voice recording timer
   useEffect(() => {
@@ -70,32 +114,11 @@ export default function MessageInput({ conversationId, onSendMessage }) {
     setRecordingSeconds(0);
   };
 
-  const fileInputRef = useRef(null);
-  const textareaRef = useRef(null);
-  const typingTimerRef = useRef(null);
-  const isTypingRef = useRef(false);
-
-  const currentUser = useAuthStore((state) => state.user);
-  const replyingTo = useChatStore((state) => state.replyingTo);
-  const setReplyingTo = useChatStore((state) => state.setReplyingTo);
-  const sendingMessage = useChatStore((state) => state.sendingMessage);
-
-  // Handle files selection
+  // Handle files selection via input dialog
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
-
-    setSelectedFiles((prev) => [...prev, ...files]);
-
-    const newPreviews = files.map((file) => ({
-      file,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      url: file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
-    }));
-
-    setFilePreviews((prev) => [...prev, ...newPreviews]);
+    addFiles(files);
     e.target.value = "";
   };
 
@@ -105,6 +128,36 @@ export default function MessageInput({ conversationId, onSendMessage }) {
       if (prev[index]?.url) URL.revokeObjectURL(prev[index].url);
       return prev.filter((_, i) => i !== index);
     });
+  };
+
+  const clearAllFiles = () => {
+    filePreviews.forEach((p) => {
+      if (p.url) URL.revokeObjectURL(p.url);
+    });
+    setSelectedFiles([]);
+    setFilePreviews([]);
+  };
+
+  // Clipboard paste support (e.g. copied screenshots / images)
+  const handlePaste = (e) => {
+    if (e.clipboardData?.files && e.clipboardData.files.length > 0) {
+      e.preventDefault();
+      addFiles(e.clipboardData.files);
+    }
+  };
+
+  // Drag and drop onto MessageInput area directly
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      addFiles(e.dataTransfer.files);
+    }
   };
 
   // Typing event emissions
@@ -187,8 +240,7 @@ export default function MessageInput({ conversationId, onSendMessage }) {
     };
 
     setContent("");
-    setSelectedFiles([]);
-    setFilePreviews([]);
+    clearAllFiles();
     setReplyingTo(null);
     setShowEmojiPicker(false);
 
@@ -210,7 +262,11 @@ export default function MessageInput({ conversationId, onSendMessage }) {
   };
 
   return (
-    <div className="relative border-t border-[#222e35] bg-[#202c33] p-2.5 sm:p-3 select-none">
+    <div
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      className="relative border-t border-[#222e35] bg-[#202c33] p-2 sm:p-3 select-none flex-shrink-0"
+    >
       {/* Active Reply Banner */}
       {replyingTo && (
         <div className="flex items-center justify-between gap-3 mb-2 px-3 py-1.5 rounded-xl bg-[#182229] border-l-4 border-[#00a884] text-xs shadow-md animate-in slide-in-from-bottom-2 duration-150">
@@ -262,12 +318,22 @@ export default function MessageInput({ conversationId, onSendMessage }) {
               </button>
             </div>
           ))}
+
+          {filePreviews.length > 1 && (
+            <button
+              type="button"
+              onClick={clearAllFiles}
+              className="px-2.5 py-1 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors flex-shrink-0"
+            >
+              Clear all
+            </button>
+          )}
         </div>
       )}
 
       {/* Emoji Picker Popup */}
       {showEmojiPicker && (
-        <div className="absolute bottom-16 left-4 z-30 p-3 rounded-2xl bg-[#202c33] border border-[#2a3942] shadow-2xl animate-in zoom-in-95 duration-150">
+        <div className="absolute bottom-16 left-2 sm:left-4 z-30 p-3 rounded-2xl bg-[#202c33] border border-[#2a3942] shadow-2xl animate-in zoom-in-95 duration-150">
           <div className="grid grid-cols-8 gap-1">
             {EMOJI_PALETTE.map((emoji) => (
               <button
@@ -315,7 +381,7 @@ export default function MessageInput({ conversationId, onSendMessage }) {
           </button>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="flex items-center gap-2 max-w-5xl mx-auto">
+        <form onSubmit={handleSubmit} className="flex items-center gap-1.5 sm:gap-2 max-w-5xl mx-auto">
           {/* Hidden File Input */}
           <input
             type="file"
@@ -331,7 +397,7 @@ export default function MessageInput({ conversationId, onSendMessage }) {
             type="button"
             title="Emojis"
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className={`p-2 rounded-full transition-colors ${
+            className={`p-1.5 sm:p-2 rounded-full transition-colors ${
               showEmojiPicker
                 ? "text-[#00a884] bg-[#103629]"
                 : "text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]"
@@ -343,10 +409,10 @@ export default function MessageInput({ conversationId, onSendMessage }) {
           {/* Attachment Button */}
           <button
             type="button"
-            title="Attach"
+            title="Attach files (or drag & drop)"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading || sendingMessage}
-            className="p-2 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] transition-colors disabled:opacity-50"
+            className="p-1.5 sm:p-2 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] transition-colors disabled:opacity-50"
           >
             <Paperclip className="w-5 h-5" />
           </button>
@@ -358,10 +424,11 @@ export default function MessageInput({ conversationId, onSendMessage }) {
               value={content}
               onChange={handleTextChange}
               onKeyDown={handleKeyDown}
-              placeholder="Type a message"
+              onPaste={handlePaste}
+              placeholder={selectedFiles.length > 0 ? "Add a caption..." : "Type a message"}
               rows={1}
               disabled={uploading || sendingMessage}
-              className="w-full resize-none max-h-32 py-2 px-4 rounded-lg bg-[#2a3942] border border-transparent text-[#e9edef] placeholder-[#8696a0] focus:outline-none focus:border-[#00a884]/60 text-sm leading-relaxed"
+              className="w-full resize-none max-h-32 py-2 px-3 sm:px-4 rounded-lg bg-[#2a3942] border border-transparent text-[#e9edef] placeholder-[#8696a0] focus:outline-none focus:border-[#00a884]/60 text-sm leading-relaxed"
             />
           </div>
 
@@ -370,7 +437,7 @@ export default function MessageInput({ conversationId, onSendMessage }) {
             <button
               type="submit"
               disabled={uploading || sendingMessage}
-              className="p-2.5 rounded-full bg-[#00a884] hover:bg-[#008069] text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm active:scale-95 transition-all flex items-center justify-center flex-shrink-0"
+              className="p-2 sm:p-2.5 rounded-full bg-[#00a884] hover:bg-[#008069] text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm active:scale-95 transition-all flex items-center justify-center flex-shrink-0"
             >
               {uploading || sendingMessage ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -383,7 +450,7 @@ export default function MessageInput({ conversationId, onSendMessage }) {
               type="button"
               onClick={() => setIsRecordingVoice(true)}
               title="Voice note"
-              className="p-2.5 rounded-full bg-[#202c33] hover:bg-[#2a3942] text-[#00a884] hover:text-[#25d366] active:scale-95 transition-all flex items-center justify-center flex-shrink-0 border border-[#2a3942]"
+              className="p-2 sm:p-2.5 rounded-full bg-[#202c33] hover:bg-[#2a3942] text-[#00a884] hover:text-[#25d366] active:scale-95 transition-all flex items-center justify-center flex-shrink-0 border border-[#2a3942]"
             >
               <Mic className="w-5 h-5" />
             </button>

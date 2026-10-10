@@ -13,6 +13,7 @@ import {
   FileText,
   Download,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 
 export default function MessageBubble({
@@ -23,6 +24,7 @@ export default function MessageBubble({
   onReact,
   onScrollToMessage,
   onOpenImageModal,
+  onDeleteMessage,
 }) {
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -135,6 +137,20 @@ export default function MessageBubble({
               <Copy className="w-3.5 h-3.5" />
             </button>
           )}
+          {onDeleteMessage && isMe && (
+            <button
+              type="button"
+              title="Delete message"
+              onClick={() => {
+                if (confirm("Delete this message?")) {
+                  onDeleteMessage(message._id);
+                }
+              }}
+              className="p-1 rounded-full text-[#8696a0] hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Reaction Picker Overlay */}
@@ -183,16 +199,20 @@ export default function MessageBubble({
             <div className="space-y-1.5 mb-1.5">
               {message.attachments.map((att, idx) => {
                 const attType = att.type || (att.mimeType?.startsWith("image/") ? "image" : "document");
+                const rawUrl = att.url || "";
+                const mediaUrl = rawUrl.startsWith("http://") || rawUrl.startsWith("https://") || rawUrl.startsWith("blob:") || rawUrl.startsWith("data:")
+                  ? rawUrl
+                  : `${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/$/, "")}/${rawUrl.replace(/^\//, "")}`;
 
                 if (attType === "image" || att.mimeType?.startsWith("image/")) {
                   return (
                     <div
                       key={idx}
                       className="overflow-hidden rounded-xl cursor-pointer group/img relative"
-                      onClick={() => onOpenImageModal && onOpenImageModal(att.url)}
+                      onClick={() => onOpenImageModal && onOpenImageModal(mediaUrl)}
                     >
                       <img
-                        src={att.url}
+                        src={mediaUrl}
                         alt={att.fileName || "Image"}
                         className="max-h-72 w-full object-cover rounded-xl hover:scale-102 transition-transform duration-200"
                         loading="lazy"
@@ -207,7 +227,7 @@ export default function MessageBubble({
                 if (attType === "video" || att.mimeType?.startsWith("video/")) {
                   return (
                     <div key={idx} className="rounded-xl overflow-hidden bg-black max-w-sm">
-                      <video src={att.url} controls className="max-h-72 w-full rounded-xl" />
+                      <video src={mediaUrl} controls className="max-h-72 w-full rounded-xl" />
                     </div>
                   );
                 }
@@ -215,7 +235,7 @@ export default function MessageBubble({
                 if (attType === "audio" || att.mimeType?.startsWith("audio/")) {
                   return (
                     <div key={idx} className="p-2 rounded-xl bg-black/5 min-w-[240px]">
-                      <audio src={att.url} controls className="w-full h-9" />
+                      <audio src={mediaUrl} controls className="w-full h-9" />
                     </div>
                   );
                 }
@@ -224,7 +244,7 @@ export default function MessageBubble({
                 return (
                   <a
                     key={idx}
-                    href={att.url}
+                    href={mediaUrl}
                     download={att.fileName}
                     target="_blank"
                     rel="noopener noreferrer"

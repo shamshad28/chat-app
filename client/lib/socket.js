@@ -1,8 +1,9 @@
 import { io } from "socket.io-client";
 
 const getSocketUrl = () => {
-  if (process.env.NEXT_PUBLIC_SOCKET_URL) {
-    return process.env.NEXT_PUBLIC_SOCKET_URL;
+  const customUrl = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL;
+  if (customUrl) {
+    return customUrl.replace(/\/+$/, "");
   }
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname || "localhost";

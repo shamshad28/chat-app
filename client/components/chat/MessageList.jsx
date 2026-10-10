@@ -16,6 +16,7 @@ export default function MessageList({
   onLoadMore,
   onReply,
   onReact,
+  onDeleteMessage,
 }) {
   const containerRef = useRef(null);
   const bottomRef = useRef(null);
@@ -147,6 +148,7 @@ export default function MessageList({
                 onReact={onReact}
                 onScrollToMessage={scrollToMessage}
                 onOpenImageModal={(url) => setSelectedImageModal(url)}
+                onDeleteMessage={onDeleteMessage}
               />
             </div>
           );

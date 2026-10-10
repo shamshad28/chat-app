@@ -37,3 +37,8 @@ export const searchMessages = async (query, conversationId = null) => {
   const response = await api.get("/api/messages/search", { params });
   return response.data;
 };
+
+export const deleteMessage = async (messageId) => {
+  const response = await api.delete(`/api/messages/${messageId}`);
+  return response.data;
+};

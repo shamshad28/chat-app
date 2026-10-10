@@ -29,8 +29,19 @@ import useChatStore from "../../store/chatStore";
 import useSocket from "../../hooks/useSocket";
 import useWebRTC from "../../hooks/useWebRTC";
 
-import { getMyConversations, getConversationById } from "../../services/conversationService";
-import { getMessages, sendMessage, toggleReaction, markConversationAsRead } from "../../services/messageService";
+import {
+  getMyConversations,
+  getConversationById,
+  deleteConversation,
+  clearChatMessages,
+} from "../../services/conversationService";
+import {
+  getMessages,
+  sendMessage,
+  toggleReaction,
+  markConversationAsRead,
+  deleteMessage,
+} from "../../services/messageService";
 import { logoutUser } from "../../services/authService";
 import { requestNotificationPermission } from "../../lib/notification";
 import { getAvatarColor, getInitials, formatMessageTime, formatLiveLastSeen } from "../../lib/utils";
@@ -52,6 +63,8 @@ import {
   MessageSquare,
   Phone,
   Video,
+  Trash2,
+  UploadCloud,
 } from "lucide-react";
 
 export default function ChatLayout({ initialConversationId = null }) {
@@ -64,6 +77,9 @@ export default function ChatLayout({ initialConversationId = null }) {
   const conversations = useChatStore((state) => state.conversations);
   const setConversations = useChatStore((state) => state.setConversations);
   const updateConversation = useChatStore((state) => state.updateConversation);
+  const removeConversation = useChatStore((state) => state.removeConversation);
+  const clearMessagesInStore = useChatStore((state) => state.clearMessagesInStore);
+  const deleteMessageInStore = useChatStore((state) => state.deleteMessageInStore);
   const activeConversation = useChatStore((state) => state.activeConversation);
   const setActiveConversation = useChatStore((state) => state.setActiveConversation);
   const messages = useChatStore((state) => state.messages);
@@ -112,6 +128,86 @@ export default function ChatLayout({ initialConversationId = null }) {
 
   // Responsive sidebar toggle for mobile
   const [showMobileSidebar, setShowMobileSidebar] = useState(!initialConversationId);
+
+  // Flexible resizable sidebar width on desktop
+  const [sidebarWidth, setSidebarWidth] = useState(380);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const isResizingRef = useRef(false);
+
+  // Drag and drop file upload states
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const dragCounterRef = useRef(0);
+  const [stagedDroppedFiles, setStagedDroppedFiles] = useState(null);
+
+  // Check desktop viewport width
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // Split-pane sidebar resize handlers
+  const handleStartResize = (e) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const handleMouseMove = (moveEvent) => {
+      if (!isResizingRef.current) return;
+      const newWidth = Math.min(Math.max(moveEvent.clientX - 54, 280), 580);
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      isResizingRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  };
+
+  // Drag & drop file upload handlers across chat workspace
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer?.items && e.dataTransfer.items.length > 0) {
+      setIsDraggingOver(true);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDraggingOver(false);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDraggingOver(false);
+
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files);
+      setStagedDroppedFiles({ id: Date.now(), files });
+    }
+  };
 
   // Initialize socket hook
   useSocket();
@@ -318,6 +414,39 @@ export default function ChatLayout({ initialConversationId = null }) {
     setReplyingTo(message);
   };
 
+  // Delete entire conversation
+  const handleDeleteConversation = async (conversationId) => {
+    try {
+      await deleteConversation(conversationId);
+      removeConversation(conversationId);
+      if (activeConversation?._id === conversationId) {
+        setActiveConversation(null);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete conversation");
+    }
+  };
+
+  // Clear all messages in conversation
+  const handleClearChat = async (conversationId) => {
+    try {
+      await clearChatMessages(conversationId);
+      clearMessagesInStore(conversationId);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to clear chat");
+    }
+  };
+
+  // Delete single message
+  const handleDeleteMessage = async (messageId) => {
+    try {
+      await deleteMessage(messageId);
+      deleteMessageInStore(messageId);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete message");
+    }
+  };
+
   // WhatsApp WebRTC Video & Voice Calls
   const {
     startCall,
@@ -402,12 +531,14 @@ export default function ChatLayout({ initialConversationId = null }) {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#111b21] text-[#e9edef] font-sans">
-      {/* 1. NATIVE-LOOKING WINDOW TITLE BAR */}
-      <WhatsAppTitleBar />
+      {/* 1. NATIVE-LOOKING WINDOW TITLE BAR (Desktop Only) */}
+      <div className="hidden md:block flex-shrink-0">
+        <WhatsAppTitleBar />
+      </div>
 
       {/* 2. MAIN APPLICATION WORKSPACE */}
       <div className="flex flex-1 overflow-hidden relative">
-        {/* A. Far Left Vertical Dock (WhatsApp Navigation Rail) */}
+        {/* A. Far Left Vertical Dock (Desktop) & Bottom Navigation Bar (Mobile) */}
         <WhatsAppSidebarDock
           activeView={showMetaAIChat ? "meta-ai" : activeDockView}
           onSelectView={(view) => {
@@ -427,13 +558,15 @@ export default function ChatLayout({ initialConversationId = null }) {
           currentUser={currentUser}
           unreadChatsCount={totalUnreadCount}
           missedCallsCount={missedCallsCount}
+          showMobileBar={showMobileSidebar && !showMetaAIChat}
         />
 
         {/* B. Middle Sidebar Column (Chats / Calls / Status / Channels / Communities) */}
         <aside
+          style={isDesktop ? { width: `${sidebarWidth}px`, minWidth: "280px", maxWidth: "580px" } : {}}
           className={`${
             showMobileSidebar && !showMetaAIChat ? "flex" : "hidden"
-          } md:flex flex-col w-full md:w-[380px] lg:w-[410px] flex-shrink-0 bg-[#111b21] border-r border-[#222e35] z-10`}
+          } md:flex flex-col w-full flex-shrink-0 bg-[#111b21] md:border-r border-[#222e35] z-10 pb-[56px] md:pb-0 h-full`}
         >
           {/* Resilience Socket Status Warning */}
           {!socketConnected && (
@@ -527,12 +660,44 @@ export default function ChatLayout({ initialConversationId = null }) {
           </div>
         </aside>
 
+        {/* Draggable Resizer Bar (Desktop Only - Flexible Split Pane) */}
+        <div
+          onMouseDown={handleStartResize}
+          onDoubleClick={() => setSidebarWidth(380)}
+          title="Drag to resize sidebar width (Double click to reset)"
+          className="hidden md:flex w-1 hover:w-1.5 bg-transparent hover:bg-[#00a884] active:bg-[#00a884] cursor-col-resize select-none h-full z-20 transition-all items-center justify-center group flex-shrink-0"
+        >
+          <div className="w-0.5 h-8 rounded-full bg-[#2a3942] group-hover:bg-[#00a884] transition-colors" />
+        </div>
+
         {/* C. Right Main Pane: Meta AI Chat / Active Chat / WhatsApp Empty State */}
         <main
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
           className={`${
             !showMobileSidebar || showMetaAIChat ? "flex" : "hidden"
           } md:flex flex-1 flex-col h-full overflow-hidden bg-[#0b141a] relative`}
         >
+          {/* Drag & Drop Visual Overlay */}
+          {isDraggingOver && activeConversation && (
+            <div className="absolute inset-0 z-50 bg-[#0b141a]/90 backdrop-blur-xs flex flex-col items-center justify-center p-6 border-2 border-dashed border-[#00a884] m-3 rounded-2xl pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+              <div className="w-20 h-20 rounded-full bg-[#00a884]/20 border border-[#00a884]/40 flex items-center justify-center text-[#00a884] mb-4 shadow-[0_0_30px_rgba(0,168,132,0.3)] animate-pulse">
+                <UploadCloud className="w-10 h-10" />
+              </div>
+              <h3 className="text-xl font-bold text-[#e9edef] tracking-tight">
+                Drop files here to send
+              </h3>
+              <p className="text-sm text-[#8696a0] mt-1.5 max-w-xs text-center">
+                Photos, videos, audio, and documents will be attached instantly
+              </p>
+              <div className="mt-4 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#202c33] border border-[#2a3942] text-xs text-[#25d366] font-medium">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Ready to attach</span>
+              </div>
+            </div>
+          )}
           {showMetaAIChat ? (
             /* Interactive Dummy LLM Meta AI Chat */
             <DummyLLMChat
@@ -623,12 +788,12 @@ export default function ChatLayout({ initialConversationId = null }) {
                 <div className="flex items-center gap-2">
                   <LiveClock className="hidden sm:inline-flex" />
 
-                  <div className="flex items-center gap-1 text-[#aebac1]">
+                  <div className="flex items-center gap-0.5 sm:gap-1 text-[#aebac1]">
                     <button
                       type="button"
                       onClick={handleStartVoiceCall}
                       title={isGroup ? "Start group voice call" : "Voice call"}
-                      className="p-2 rounded-full hover:text-[#00a884] hover:bg-[#2a3942] active:scale-95 transition-all"
+                      className="p-1.5 sm:p-2 rounded-full hover:text-[#00a884] hover:bg-[#2a3942] active:scale-95 transition-all"
                     >
                       <Phone className="w-4 h-4" />
                     </button>
@@ -637,7 +802,7 @@ export default function ChatLayout({ initialConversationId = null }) {
                       type="button"
                       onClick={handleStartVideoCall}
                       title={isGroup ? "Start group video call" : "Video call"}
-                      className="p-2 rounded-full hover:text-[#00a884] hover:bg-[#2a3942] active:scale-95 transition-all"
+                      className="p-1.5 sm:p-2 rounded-full hover:text-[#00a884] hover:bg-[#2a3942] active:scale-95 transition-all"
                     >
                       <Video className="w-4 h-4" />
                     </button>
@@ -646,7 +811,7 @@ export default function ChatLayout({ initialConversationId = null }) {
                       type="button"
                       title="Search in this conversation"
                       onClick={() => setIsInChatSearchOpen(!isInChatSearchOpen)}
-                      className={`p-2 rounded-full transition-colors ${
+                      className={`p-1.5 sm:p-2 rounded-full transition-colors ${
                         isInChatSearchOpen
                           ? "text-[#00a884] bg-[#103629]"
                           : "text-[#aebac1] hover:text-[#e9edef] hover:bg-[#2a3942]"
@@ -659,13 +824,32 @@ export default function ChatLayout({ initialConversationId = null }) {
                       type="button"
                       title={isGroup ? "Group info & settings" : "Contact info & details"}
                       onClick={() => setIsContactInfoOpen(!isContactInfoOpen)}
-                      className={`p-2 rounded-full transition-colors ${
+                      className={`p-1.5 sm:p-2 rounded-full transition-colors ${
                         isContactInfoOpen
                           ? "text-[#00a884] bg-[#2a3942]"
                           : "text-[#aebac1] hover:text-[#e9edef] hover:bg-[#2a3942]"
                       }`}
                     >
                       <Info className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      title={isGroup ? "Delete group" : "Delete chat"}
+                      onClick={() => {
+                        if (
+                          confirm(
+                            `Are you sure you want to delete this ${
+                              isGroup ? "group" : "chat"
+                            }? All messages will be permanently deleted.`
+                          )
+                        ) {
+                          handleDeleteConversation(activeConversation._id);
+                        }
+                      }}
+                      className="p-1.5 sm:p-2 rounded-full text-[#aebac1] hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -710,6 +894,7 @@ export default function ChatLayout({ initialConversationId = null }) {
                       onLoadMore={handleLoadMoreMessages}
                       onReply={handleReplyToMessage}
                       onReact={handleReactToMessage}
+                      onDeleteMessage={handleDeleteMessage}
                     />
                   </div>
 
@@ -717,6 +902,7 @@ export default function ChatLayout({ initialConversationId = null }) {
                   <MessageInput
                     conversationId={activeConversation._id}
                     onSendMessage={handleSendMessage}
+                    droppedFiles={stagedDroppedFiles}
                   />
                 </div>
 
@@ -733,6 +919,8 @@ export default function ChatLayout({ initialConversationId = null }) {
                     onStartVideoCall={handleStartVideoCall}
                     onOpenSearch={() => setIsInChatSearchOpen(true)}
                     onOpenGroupSettings={() => setIsGroupSettingOpen(true)}
+                    onClearChat={handleClearChat}
+                    onDeleteChat={handleDeleteConversation}
                   />
                 )}
               </div>

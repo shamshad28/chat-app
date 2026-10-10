@@ -18,9 +18,16 @@ if (isCloudinaryConfigured()) {
   });
 }
 
-const uploadsDir = path.join(__dirname, "../uploads");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+const uploadsDir = process.env.VERCEL
+  ? "/tmp/uploads"
+  : path.join(__dirname, "../uploads");
+
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+} catch (err) {
+  console.warn("Notice: Local uploads folder creation:", err.message);
 }
 
 const getFileType = (mimeType) => {
@@ -69,9 +76,8 @@ const uploadFile = async (file, req) => {
   const filePath = path.join(uploadsDir, uniqueName);
   fs.writeFileSync(filePath, file.buffer);
 
-  const protocol = req.protocol || "http";
-  const host = req.get("host") || "localhost:5000";
-  const fileUrl = `${protocol}://${host}/uploads/${uniqueName}`;
+  const backendBase = process.env.BACKEND_URL || `${req.protocol || "http"}://${req.get("host") || "localhost:5000"}`;
+  const fileUrl = `${backendBase}/uploads/${uniqueName}`;
 
   return {
     url: fileUrl,

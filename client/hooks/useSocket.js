@@ -12,35 +12,22 @@ export default function useSocket() {
   const user = useAuthStore((state) => state.user);
   const activeConversation = useChatStore((state) => state.activeConversation);
 
-  const addMessage = useChatStore((state) => state.addMessage);
-  const updateConversationLastMessage = useChatStore(
-    (state) => state.updateConversationLastMessage
-  );
-  const addConversation = useChatStore((state) => state.addConversation);
-  const updateConversation = useChatStore((state) => state.updateConversation);
-  const removeConversation = useChatStore((state) => state.removeConversation);
-  const updateMessageReactions = useChatStore((state) => state.updateMessageReactions);
-  const markMessagesReadInStore = useChatStore((state) => state.markMessagesReadInStore);
-  const setOnlineUsers = useChatStore((state) => state.setOnlineUsers);
-  const updateUserPresence = useChatStore((state) => state.updateUserPresence);
-  const setUserTyping = useChatStore((state) => state.setUserTyping);
-  const removeUserTyping = useChatStore((state) => state.removeUserTyping);
-  const setSocketConnected = useChatStore((state) => state.setSocketConnected);
-
   const activeConvRef = useRef(activeConversation);
   activeConvRef.current = activeConversation;
 
   const userRef = useRef(user);
   userRef.current = user;
 
-  useEffect(() => {
-    if (!user) return;
+  const userId = (user?._id || user?.id)?.toString();
 
-    connectSocket(user);
+  useEffect(() => {
+    if (!userRef.current) return;
+
+    connectSocket(userRef.current);
 
     const handleConnect = () => {
-      setSocketConnected(true);
-      socket.emit("setup", user);
+      useChatStore.getState().setSocketConnected(true);
+      socket.emit("setup", userRef.current);
       socket.emit("getOnlineUsers");
 
       if (activeConvRef.current?._id) {
@@ -49,15 +36,15 @@ export default function useSocket() {
     };
 
     const handleDisconnect = () => {
-      setSocketConnected(false);
+      useChatStore.getState().setSocketConnected(false);
     };
 
     const handleOnlineUsersList = (usersList) => {
-      setOnlineUsers(usersList);
+      useChatStore.getState().setOnlineUsers(usersList);
     };
 
-    const handlePresenceUpdate = ({ userId, status, lastSeen }) => {
-      updateUserPresence(userId, status, lastSeen);
+    const handlePresenceUpdate = ({ userId: pUserId, status, lastSeen }) => {
+      useChatStore.getState().updateUserPresence(pUserId, status, lastSeen);
     };
 
     const handleNewMessage = (message) => {
@@ -77,7 +64,7 @@ export default function useSocket() {
       const isFromMe = String(senderId) === String(currentUserId);
 
       if (isCurrentChat) {
-        addMessage(message);
+        useChatStore.getState().addMessage(message);
 
         // If window is visible and active, mark as read
         if (!isFromMe && document.visibilityState === "visible") {
@@ -88,7 +75,7 @@ export default function useSocket() {
         }
       }
 
-      updateConversationLastMessage(convId, message);
+      useChatStore.getState().updateConversationLastMessage(convId, message);
 
       // Audio & Desktop Notification if message is from someone else and not in current focus
       if (!isFromMe) {
@@ -100,10 +87,10 @@ export default function useSocket() {
             message.type === "image"
               ? "📷 Photo"
               : message.type === "video"
-              ? "🎥 Video"
-              : message.type === "document"
-              ? "📄 Document"
-              : message.content || "Sent an attachment";
+                ? "🎥 Video"
+                : message.type === "document"
+                  ? "📄 Document"
+                  : message.content || "Sent an attachment";
 
           showDesktopNotification(senderName, snippet);
 
@@ -140,10 +127,10 @@ export default function useSocket() {
           message.type === "image"
             ? "📷 Photo"
             : message.type === "video"
-            ? "🎥 Video"
-            : message.type === "document"
-            ? "📄 Document"
-            : message.content || "Media";
+              ? "🎥 Video"
+              : message.type === "document"
+                ? "📄 Document"
+                : message.content || "Media";
 
         showDesktopNotification(title, `${message.sender?.name || "User"}: ${snippet}`);
 
@@ -159,33 +146,44 @@ export default function useSocket() {
       }
     };
 
-
-    const handleMessagesRead = ({ conversationId, userId }) => {
-      markMessagesReadInStore(conversationId, userId);
+    const handleMessagesRead = ({ conversationId, userId: readerId }) => {
+      useChatStore.getState().markMessagesReadInStore(conversationId, readerId);
     };
 
     const handleReactionUpdated = ({ messageId, reactions }) => {
-      updateMessageReactions(messageId, reactions);
+      useChatStore.getState().updateMessageReactions(messageId, reactions);
     };
 
     const handleTypingStarted = ({ conversationId, user: typingUser }) => {
-      setUserTyping(conversationId, typingUser);
+      useChatStore.getState().setUserTyping(conversationId, typingUser);
     };
 
-    const handleTypingStopped = ({ conversationId, userId }) => {
-      removeUserTyping(conversationId, userId);
+    const handleTypingStopped = ({ conversationId, userId: typerId }) => {
+      useChatStore.getState().removeUserTyping(conversationId, typerId);
     };
 
     const handleConversationNew = (conversation) => {
-      addConversation(conversation);
+      useChatStore.getState().addConversation(conversation);
     };
 
     const handleGroupUpdated = (updatedGroup) => {
-      updateConversation(updatedGroup);
+      useChatStore.getState().updateConversation(updatedGroup);
     };
 
     const handleGroupRemoved = ({ conversationId }) => {
-      removeConversation(conversationId);
+      useChatStore.getState().removeConversation(conversationId);
+    };
+
+    const handleConversationDeleted = ({ conversationId }) => {
+      useChatStore.getState().removeConversation(conversationId);
+    };
+
+    const handleConversationCleared = ({ conversationId }) => {
+      useChatStore.getState().clearMessagesInStore(conversationId);
+    };
+
+    const handleMessageDeleted = ({ messageId }) => {
+      useChatStore.getState().deleteMessageInStore(messageId);
     };
 
     socket.on("connect", handleConnect);
@@ -201,6 +199,9 @@ export default function useSocket() {
     socket.on("conversation:new", handleConversationNew);
     socket.on("group:updated", handleGroupUpdated);
     socket.on("group:removed", handleGroupRemoved);
+    socket.on("conversation:deleted", handleConversationDeleted);
+    socket.on("conversation:cleared", handleConversationCleared);
+    socket.on("message:deleted", handleMessageDeleted);
 
     if (socket.connected) {
       handleConnect();
@@ -220,22 +221,11 @@ export default function useSocket() {
       socket.off("conversation:new", handleConversationNew);
       socket.off("group:updated", handleGroupUpdated);
       socket.off("group:removed", handleGroupRemoved);
+      socket.off("conversation:deleted", handleConversationDeleted);
+      socket.off("conversation:cleared", handleConversationCleared);
+      socket.off("message:deleted", handleMessageDeleted);
     };
-  }, [
-    user,
-    setSocketConnected,
-    setOnlineUsers,
-    updateUserPresence,
-    addMessage,
-    updateConversationLastMessage,
-    addConversation,
-    updateConversation,
-    removeConversation,
-    updateMessageReactions,
-    markMessagesReadInStore,
-    setUserTyping,
-    removeUserTyping,
-  ]);
+  }, [userId]);
 
   return { socket };
 }
